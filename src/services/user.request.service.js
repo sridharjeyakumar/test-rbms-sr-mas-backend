@@ -24,16 +24,20 @@ export const calculateOverallStatus = (request, userDepartment = null) => {
         remarkByManager,
         disconnectionRequestRejectRemarks,
         adminRequestStatus,
+        remark,
     } = request;
+    const remarkValue = remark || "";
 
     // Final state: User has accepted the sanctioned request
-    if (isSanctioned && userAcceptanceForSanction) {
-        return "Sanctioned and Accepted";
+    if (isSanctioned && userAcceptanceForSanction && remarkValue === "") {
+        return "Sanctioned and Accepted by SSE";
     }
-
+    if (isSanctioned && userAcceptanceForSanction === false && remarkValue !== "") {
+        return "Sanctioned and Rejected by SSE";
+    }
     // Request is sanctioned but waiting for user acceptance
     if (isSanctioned && !userAcceptanceForSanction) {
-        return "Sanctioned";
+        return "Sanctioned, Pending with SSE For Acceptance";
     }
 
     // Check for rejection scenarios
@@ -79,9 +83,55 @@ export const calculateOverallStatus = (request, userDepartment = null) => {
     if (
         managerAcceptance &&
         adminAcceptance === false &&
-        (adminRequestStatus !== "REJECTED" || adminRequestStatus !== "APPROVED")
+        sntDisconnectionRequired &&
+        allSntAcceptance === "ACCEPTED" &&
+        (enggDisconnectionsRequired === false ||
+            (enggDisconnectionsRequired && allEnggAcceptance === "ACCEPTED")) &&
+        (powerBlockRequired === false || (powerBlockRequired && allTrdAcceptance === "ACCEPTED")) &&
+        adminRequestStatus !== "REJECTED" &&
+        adminRequestStatus !== "APPROVED"
     ) {
-        return " with  optg";
+        return "with optg";
+    }
+
+    if (
+        managerAcceptance &&
+        adminAcceptance === false &&
+        enggDisconnectionsRequired &&
+        allEnggAcceptance === "ACCEPTED" &&
+        (sntDisconnectionRequired === false ||
+            (sntDisconnectionRequired && allSntAcceptance === "ACCEPTED")) &&
+        (powerBlockRequired === false || (powerBlockRequired && allTrdAcceptance === "ACCEPTED")) &&
+        adminRequestStatus !== "REJECTED" &&
+        adminRequestStatus !== "APPROVED"
+    ) {
+        return "with optg";
+    }
+
+    if (
+        managerAcceptance &&
+        adminAcceptance === false &&
+        powerBlockRequired &&
+        allTrdAcceptance === "ACCEPTED" &&
+        (sntDisconnectionRequired === false ||
+            (sntDisconnectionRequired && allSntAcceptance === "ACCEPTED")) &&
+        (enggDisconnectionsRequired === false ||
+            (enggDisconnectionsRequired && allEnggAcceptance === "ACCEPTED")) &&
+        adminRequestStatus !== "REJECTED" &&
+        adminRequestStatus !== "APPROVED"
+    ) {
+        return "with optg";
+    }
+    if (
+        managerAcceptance &&
+        adminAcceptance === false &&
+        powerBlockRequired === false &&
+        sntDisconnectionRequired === false &&
+        enggDisconnectionsRequired === false &&
+        adminRequestStatus !== "REJECTED" &&
+        adminRequestStatus !== "APPROVED"
+    ) {
+        return "with optg";
     }
 
     // Manager has accepted, now check what disconnections are still pending
@@ -188,9 +238,293 @@ export const calculateOverallStatus = (request, userDepartment = null) => {
 //     });
 // };
 
+// export const createRequest = async (data, userId, divisionCode) => {
+//     try {
+//         // List of allowed fields from Prisma schema
+//         const allowedFields = [
+//             "adminAcceptance",
+//             "date",
+//             "emergencyBlockRemarks",
+//             "selectedDepartment",
+//             "selectedSection",
+//             "stationID",
+//             "missionBlock",
+//             "workType",
+//             "activity",
+//             "freshCautionRequired",
+//             "freshCautionSpeed",
+//             "freshCautionLocationFrom",
+//             "freshCautionLocationTo",
+//             "adjacentLinesAffected",
+//             "workLocationFrom",
+//             "workLocationTo",
+//             "demandTimeFrom",
+//             "demandTimeTo",
+//             "sigDisconnection",
+//             "elementarySection",
+//             "elementarySectionTo",
+//             "sigElementarySectionFrom",
+//             "sigElementarySectionTo",
+//             "repercussions",
+//             "trdWorkLocation",
+//             "requestremarks",
+//             "status",
+//             "selectedDepo",
+//             "sigResponse",
+//             "ohDisconnection",
+//             "oheDisconnection",
+//             "oheResponse",
+//             "corridorType",
+//             "corridorTypeSelection",
+//             "sigActionsNeeded",
+//             "trdActionsNeeded",
+//             "ManagerResponse",
+//             "sigDisconnectionRequirements",
+//             "sntDisconnectionRequirements",
+//             "sntDisconnectionLine",
+//             "sntDisconnectionLineFrom",
+//             "sntDisconnectionLineTo",
+//             "trdDisconnectionRequirements",
+//             "powerBlockRequirements",
+//             "powerBlockRequired",
+//             "sntDisconnectionRequired",
+//             "processedLineSections",
+//             "routeFrom",
+//             "routeTo",
+//             "DisconnAcceptance",
+//             "managerAcceptanceId",
+//             "managerAcceptance",
+//             "adminAcceptanceId",
+//             "adminAcceptance",
+//             "sntDisconnectionAssignTo",
+//             "trdDisconnectionAssignTo",
+//             "engDisconnectionAssignTo",
+//             "workNature",
+//             "powerBlockDisconnectionAssignTo",
+//             "duration",
+//             "isSanctioned",
+//             "enggDisconnectionsRequired",
+//             "engDisconnectionRemarks",
+//             "tpcRemarks",
+//             "freshCautionFromDate",
+//             "freshCautionToDate",
+//             "freshCautionFromTime",
+//             "freshCautionToTime",
+//         ];
+
+//         // Filter out any fields not in allowedFields
+//         const filteredData = Object.fromEntries(
+//             Object.entries(data).filter(([key]) => allowedFields.includes(key)),
+//         );
+
+//         // 1. Use the exact date from frontend request
+//         const requestDate = new Date(data.date);
+//         const now = new Date(); // Current timestamp for createdAt
+//         const istOffset = 5.5 * 60 * 60 * 1000;
+//         const istNow = new Date(now.getTime() + istOffset);
+
+//         // 2. Get last 2 digits of year
+//         const yearPart = requestDate.getFullYear().toString().slice(-2);
+
+//         // 3. Convert month to letter (A=Jan, B=Feb, etc., skipping I)
+//         const month = requestDate.getMonth();
+//         let monthChar = String.fromCharCode(65 + month);
+//         if (month >= 8) monthChar = String.fromCharCode(66 + month); // Skip I
+
+//         // 4. Fixed "K"
+//         const fixedChar = "K";
+
+//         // 5. Map division code to corresponding letter
+//         const divisionMap = {
+//             MAS: "A",
+//             MDU: "B",
+//             SA: "C",
+//             PGT: "D",
+//             TPJ: "E",
+//             TVC: "F",
+//         };
+
+//         // Get the base division code (first 3 characters)
+//         const baseDivisionCode = divisionCode?.toUpperCase().slice(0, 3) || "GEN";
+//         // Get the mapped letter or use original if not in map
+//         const divisionLetter = divisionMap[baseDivisionCode] || baseDivisionCode.slice(0, 1);
+
+//         // 6. Calculate date range for current month
+//         const startOfMonth = new Date(requestDate.getFullYear(), requestDate.getMonth(), 1);
+//         const endOfMonth = new Date(requestDate.getFullYear(), requestDate.getMonth() + 1, 1);
+
+//         // 7. Find most recent request for this month+division
+//         // const lastRequest = await prisma.request.findFirst({
+//         //     where: {
+//         //         createdAt: { lt: istNow }, // Only check requests created before this one
+//         //         date: { gte: startOfMonth, lt: endOfMonth },
+//         //         divisionId: {
+//         //             startsWith: `${yearPart}${monthChar}${fixedChar}${divisionLetter}`,
+//         //         },
+//         //     },
+//         //     orderBy: { createdAt: "desc" }, // Get the newest one
+//         // });
+//         const lastRequest = await prisma.request.findFirst({
+//             where: {
+//                 date: { gte: startOfMonth, lt: endOfMonth },
+//                 divisionId: {
+//                     startsWith: `${yearPart}${monthChar}${fixedChar}${divisionLetter}`,
+//                 },
+//             },
+//             orderBy: { divisionId: "desc" }, // <-- use divisionId, not createdAt
+//         });
+
+//         // 8. Determine increment number (now 5 digits)
+//         const lastIncrement = lastRequest?.divisionId?.slice(-5) || "00000";
+//         const incrementPart = (parseInt(lastIncrement) + 1).toString().padStart(5, "0");
+
+//         // 9. Generate final ID (format: YYMonthKDivisionLetter#####)
+//         const divisionId = `${yearPart}${monthChar}${fixedChar}${divisionLetter}${incrementPart}`;
+
+//         // Extras. If any of the isSanctioned and managerAcceptance are true, set sanctioned times and manager response timing
+//         if (filteredData.isSanctioned === true) {
+//             filteredData.sanctionedTimeFrom = filteredData.demandTimeFrom;
+//             filteredData.sanctionedTimeTo = filteredData.demandTimeTo;
+//             // filteredData.DisconnAcceptance = "ACCEPTED";
+//             // filteredData.sigActionsNeeded = true;
+//             // filteredData.trdActionsNeeded = true;
+//             filteredData.allSntAcceptance = true;
+//             filteredData.allTrdAcceptance = true;
+//             filteredData.allEnggAcceptance = true;
+//             filteredData.managerAcceptance = true;
+//             filteredData.managerAcceptanceId = "System";
+//             filteredData.adminAcceptance = true;
+//             filteredData.adminAcceptanceId = "System";
+//             filteredData.optimizeStatus = true;
+//             filteredData.userAcceptanceForSanction = true;
+//         }
+
+//         if (filteredData.managerAcceptance === true) {
+//             filteredData.managerResponseTiming = istNow;
+//         }
+
+//         // Calculate overall status using the common function
+//         const overAllStatus = calculateOverallStatus({
+//             isSanctioned: filteredData.isSanctioned,
+//             userAcceptanceForSanction: filteredData.userAcceptanceForSanction,
+//             managerAcceptance: filteredData.managerAcceptance,
+//             adminAcceptance: filteredData.adminAcceptance,
+//             allSntAcceptance: filteredData.allSntAcceptance ? "ACCEPTED" : "PENDING",
+//             allTrdAcceptance: filteredData.allTrdAcceptance ? "ACCEPTED" : "PENDING",
+//             allEnggAcceptance: filteredData.allEnggAcceptance ? "ACCEPTED" : "PENDING",
+//             sntDisconnectionRequired: filteredData.sntDisconnectionRequired,
+//             enggDisconnectionsRequired: filteredData.enggDisconnectionsRequired,
+//             powerBlockRequired: filteredData.powerBlockRequired,
+//             optimizeStatus: filteredData.optimizeStatus,
+//             remarkByManager: null,
+//             disconnectionRequestRejectRemarks: null,
+//         });
+
+//         // 10. Create the request with generated ID and disconnection records
+//         const createdRequest = await prisma.$transaction(async (prisma) => {
+//             // Create the main request
+//             const request = await prisma.request.create({
+//                 data: {
+//                     ...filteredData,
+//                     userId,
+//                     status: filteredData.isSanctioned ? "APPROVED" : "PENDING",
+//                     divisionId,
+//                     overAllStatus,
+//                     createdAt: now,
+//                 },
+//             });
+//             if (filteredData.enggDisconnectionsRequired && filteredData.engDisconnectionAssignTo) {
+//                 // Split the depot string by comma and process each depot
+//                 const sntDepots = filteredData.engDisconnectionAssignTo
+//                     .split(",")
+//                     .map((depot) => depot.trim())
+//                     .filter((depot) => depot.length > 0);
+
+//                 for (const depot of sntDepots) {
+//                     await prisma.enggDisconnection.create({
+//                         data: {
+//                             requestId: request.id,
+//                             depot: depot,
+//                             status: "PENDING",
+//                         },
+//                     });
+//                 }
+//             }
+//             // Create S&T disconnections if required
+//             if (filteredData.sntDisconnectionRequired && filteredData.sntDisconnectionAssignTo) {
+//                 // Split the depot string by comma and process each depot
+//                 const sntDepots = filteredData.sntDisconnectionAssignTo
+//                     .split(",")
+//                     .map((depot) => depot.trim())
+//                     .filter((depot) => depot.length > 0);
+
+//                 for (const depot of sntDepots) {
+//                     await prisma.sntDisconnection.create({
+//                         data: {
+//                             requestId: request.id,
+//                             depot: depot,
+//                             status: "PENDING",
+//                         },
+//                     });
+//                 }
+//             }
+
+//             // Create TRD disconnections if required
+//             if (filteredData.powerBlockRequired && filteredData.powerBlockDisconnectionAssignTo) {
+//                 // Split the depot string by comma and process each depot
+//                 const trdDepots = filteredData.powerBlockDisconnectionAssignTo
+//                     .split(",")
+//                     .map((depot) => depot.trim())
+//                     .filter((depot) => depot.length > 0);
+
+//                 for (const depot of trdDepots) {
+//                     await prisma.trdDisconnection.create({
+//                         data: {
+//                             requestId: request.id,
+//                             depot: depot,
+//                             status: "PENDING",
+//                         },
+//                     });
+//                 }
+//             }
+
+//             return request;
+//         });
+
+//         // Notify all USERs in selectedSection depot
+//         try {
+//             await notificationService.notifyUsersInSelectedSection(createdRequest);
+//         } catch (notificationError) {
+//             console.error("Failed to notify users in selectedSection depot:", notificationError);
+//         }
+
+//         // Notify DEPT_CONTROLLERs for S&T/TRD disconnections if required
+//         try {
+//             await notificationService.notifyDeptControllersForDisconnections(createdRequest);
+//         } catch (notificationError) {
+//             console.error(
+//                 "Failed to notify DEPT_CONTROLLERs for disconnections:",
+//                 notificationError,
+//             );
+//         }
+
+//         // Notify DEPT_CONTROLLER for urgent requests
+//         if (filteredData.corridorType === "Urgent Block") {
+//             try {
+//                 await notificationService.notifyDeptControllerForUrgentRequest(createdRequest);
+//             } catch (notificationError) {
+//                 console.error("Failed to send notification:", notificationError);
+//             }
+//         }
+
+//         return createdRequest;
+//     } catch (error) {
+//         console.log(error);
+//         throw error;
+//     }
+// };
 export const createRequest = async (data, userId, divisionCode) => {
     try {
-        // List of allowed fields from Prisma schema
         const allowedFields = [
             "adminAcceptance",
             "date",
@@ -255,87 +589,54 @@ export const createRequest = async (data, userId, divisionCode) => {
             "isSanctioned",
             "enggDisconnectionsRequired",
             "engDisconnectionRemarks",
+            "tpcRemarks",
+            "freshCautions",
+            "assetNumber",
+            "assetName",
         ];
 
-        // Filter out any fields not in allowedFields
         const filteredData = Object.fromEntries(
             Object.entries(data).filter(([key]) => allowedFields.includes(key)),
         );
 
-        // 1. Use the exact date from frontend request
+        // ✅ Store freshCautions array as JSON (if exists)
+        if (data.freshCautions && Array.isArray(data.freshCautions)) {
+            filteredData.freshCautions = data.freshCautions;
+        }
+
         const requestDate = new Date(data.date);
-        const now = new Date(); // Current timestamp for createdAt
+        const now = new Date();
         const istOffset = 5.5 * 60 * 60 * 1000;
         const istNow = new Date(now.getTime() + istOffset);
-
-        // 2. Get last 2 digits of year
         const yearPart = requestDate.getFullYear().toString().slice(-2);
-
-        // 3. Convert month to letter (A=Jan, B=Feb, etc., skipping I)
         const month = requestDate.getMonth();
         let monthChar = String.fromCharCode(65 + month);
-        if (month >= 8) monthChar = String.fromCharCode(66 + month); // Skip I
-
-        // 4. Fixed "K"
+        if (month >= 8) monthChar = String.fromCharCode(66 + month);
         const fixedChar = "K";
-
-        // 5. Map division code to corresponding letter
-        const divisionMap = {
-            MAS: "A",
-            MDU: "B",
-            SA: "C",
-            PGT: "D",
-            TPJ: "E",
-            TVC: "F",
-        };
-
-        // Get the base division code (first 3 characters)
+        const divisionMap = { MAS: "A", MDU: "B", SA: "C", PGT: "D", TPJ: "E", TVC: "F" };
         const baseDivisionCode = divisionCode?.toUpperCase().slice(0, 3) || "GEN";
-        // Get the mapped letter or use original if not in map
         const divisionLetter = divisionMap[baseDivisionCode] || baseDivisionCode.slice(0, 1);
-
-        // 6. Calculate date range for current month
         const startOfMonth = new Date(requestDate.getFullYear(), requestDate.getMonth(), 1);
         const endOfMonth = new Date(requestDate.getFullYear(), requestDate.getMonth() + 1, 1);
 
-        // 7. Find most recent request for this month+division
-        // const lastRequest = await prisma.request.findFirst({
-        //     where: {
-        //         createdAt: { lt: istNow }, // Only check requests created before this one
-        //         date: { gte: startOfMonth, lt: endOfMonth },
-        //         divisionId: {
-        //             startsWith: `${yearPart}${monthChar}${fixedChar}${divisionLetter}`,
-        //         },
-        //     },
-        //     orderBy: { createdAt: "desc" }, // Get the newest one
-        // });
         const lastRequest = await prisma.request.findFirst({
             where: {
                 date: { gte: startOfMonth, lt: endOfMonth },
-                divisionId: {
-                    startsWith: `${yearPart}${monthChar}${fixedChar}${divisionLetter}`,
-                },
+                divisionId: { startsWith: `${yearPart}${monthChar}${fixedChar}${divisionLetter}` },
             },
-            orderBy: { divisionId: "desc" }, // <-- use divisionId, not createdAt
+            orderBy: { divisionId: "desc" },
         });
 
-        // 8. Determine increment number (now 5 digits)
         const lastIncrement = lastRequest?.divisionId?.slice(-5) || "00000";
         const incrementPart = (parseInt(lastIncrement) + 1).toString().padStart(5, "0");
-
-        // 9. Generate final ID (format: YYMonthKDivisionLetter#####)
         const divisionId = `${yearPart}${monthChar}${fixedChar}${divisionLetter}${incrementPart}`;
 
-        // Extras. If any of the isSanctioned and managerAcceptance are true, set sanctioned times and manager response timing
         if (filteredData.isSanctioned === true) {
             filteredData.sanctionedTimeFrom = filteredData.demandTimeFrom;
             filteredData.sanctionedTimeTo = filteredData.demandTimeTo;
-            // filteredData.DisconnAcceptance = "ACCEPTED";
-            // filteredData.sigActionsNeeded = true;
-            // filteredData.trdActionsNeeded = true;
-            filteredData.allSntAcceptance = true;
-            filteredData.allTrdAcceptance = true;
-            filteredData.allEnggAcceptance = true;
+            filteredData.allSntAcceptance = "ACCEPTED";
+            filteredData.allTrdAcceptance = "ACCEPTED";
+            filteredData.allEnggAcceptance = "ACCEPTED";
             filteredData.managerAcceptance = true;
             filteredData.managerAcceptanceId = "System";
             filteredData.adminAcceptance = true;
@@ -348,7 +649,6 @@ export const createRequest = async (data, userId, divisionCode) => {
             filteredData.managerResponseTiming = istNow;
         }
 
-        // Calculate overall status using the common function
         const overAllStatus = calculateOverallStatus({
             isSanctioned: filteredData.isSanctioned,
             userAcceptanceForSanction: filteredData.userAcceptanceForSanction,
@@ -361,13 +661,9 @@ export const createRequest = async (data, userId, divisionCode) => {
             enggDisconnectionsRequired: filteredData.enggDisconnectionsRequired,
             powerBlockRequired: filteredData.powerBlockRequired,
             optimizeStatus: filteredData.optimizeStatus,
-            remarkByManager: null,
-            disconnectionRequestRejectRemarks: null,
         });
 
-        // 10. Create the request with generated ID and disconnection records
         const createdRequest = await prisma.$transaction(async (prisma) => {
-            // Create the main request
             const request = await prisma.request.create({
                 data: {
                     ...filteredData,
@@ -375,60 +671,45 @@ export const createRequest = async (data, userId, divisionCode) => {
                     status: filteredData.isSanctioned ? "APPROVED" : "PENDING",
                     divisionId,
                     overAllStatus,
-                    createdAt: now,
+                    createdAt: istNow,
                 },
             });
+
             if (filteredData.enggDisconnectionsRequired && filteredData.engDisconnectionAssignTo) {
-                // Split the depot string by comma and process each depot
                 const sntDepots = filteredData.engDisconnectionAssignTo
                     .split(",")
-                    .map((depot) => depot.trim())
-                    .filter((depot) => depot.length > 0);
+                    .map((x) => x.trim())
+                    .filter(Boolean);
 
                 for (const depot of sntDepots) {
                     await prisma.enggDisconnection.create({
-                        data: {
-                            requestId: request.id,
-                            depot: depot,
-                            status: "PENDING",
-                        },
+                        data: { requestId: request.id, depot, status: "PENDING" },
                     });
                 }
             }
-            // Create S&T disconnections if required
+
             if (filteredData.sntDisconnectionRequired && filteredData.sntDisconnectionAssignTo) {
-                // Split the depot string by comma and process each depot
                 const sntDepots = filteredData.sntDisconnectionAssignTo
                     .split(",")
-                    .map((depot) => depot.trim())
-                    .filter((depot) => depot.length > 0);
+                    .map((x) => x.trim())
+                    .filter(Boolean);
 
                 for (const depot of sntDepots) {
                     await prisma.sntDisconnection.create({
-                        data: {
-                            requestId: request.id,
-                            depot: depot,
-                            status: "PENDING",
-                        },
+                        data: { requestId: request.id, depot, status: "PENDING" },
                     });
                 }
             }
 
-            // Create TRD disconnections if required
             if (filteredData.powerBlockRequired && filteredData.powerBlockDisconnectionAssignTo) {
-                // Split the depot string by comma and process each depot
                 const trdDepots = filteredData.powerBlockDisconnectionAssignTo
                     .split(",")
-                    .map((depot) => depot.trim())
-                    .filter((depot) => depot.length > 0);
+                    .map((x) => x.trim())
+                    .filter(Boolean);
 
                 for (const depot of trdDepots) {
                     await prisma.trdDisconnection.create({
-                        data: {
-                            requestId: request.id,
-                            depot: depot,
-                            status: "PENDING",
-                        },
+                        data: { requestId: request.id, depot, status: "PENDING" },
                     });
                 }
             }
@@ -436,30 +717,16 @@ export const createRequest = async (data, userId, divisionCode) => {
             return request;
         });
 
-        // Notify all USERs in selectedSection depot
         try {
             await notificationService.notifyUsersInSelectedSection(createdRequest);
-        } catch (notificationError) {
-            console.error("Failed to notify users in selectedSection depot:", notificationError);
-        }
-
-        // Notify DEPT_CONTROLLERs for S&T/TRD disconnections if required
+        } catch {}
         try {
             await notificationService.notifyDeptControllersForDisconnections(createdRequest);
-        } catch (notificationError) {
-            console.error(
-                "Failed to notify DEPT_CONTROLLERs for disconnections:",
-                notificationError,
-            );
-        }
-
-        // Notify DEPT_CONTROLLER for urgent requests
+        } catch {}
         if (filteredData.corridorType === "Urgent Block") {
             try {
                 await notificationService.notifyDeptControllerForUrgentRequest(createdRequest);
-            } catch (notificationError) {
-                console.error("Failed to send notification:", notificationError);
-            }
+            } catch {}
         }
 
         return createdRequest;
@@ -560,6 +827,7 @@ export const editRequest = async (
     optimizeTimeTo,
     date,
     mobileView,
+    sanctionedRemark,
 ) => {
     const updatedRequest = await prisma.request.update({
         where: { id: requestId },
@@ -568,6 +836,7 @@ export const editRequest = async (
             optimizeTimeTo,
             date,
             optimizeStatus: true,
+            sanctionedRemarks: sanctionedRemark || null,
             // ...(mobileView && { isSanctioned: true }),
         },
     });
@@ -653,7 +922,25 @@ export const updateSanctionStatus = async (requests) => {
         throw new Error("Failed to update records in database");
     }
 };
+// services/requestService.js
+export const updateDraftStatus = async (requests) => {
+    try {
+        const updates = requests.map((request) => {
+            return prisma.request.update({
+                where: { id: request.id },
+                data: {
+                    Draft: true,
+                    sanctionedRemarks: request.sanctionedRemark || null,
+                },
+            });
+        });
 
+        return await prisma.$transaction(updates);
+    } catch (error) {
+        console.error("Database error in updateDraftStatus:", error);
+        throw new Error("Failed to update draft status in database");
+    }
+};
 export const deleteOptimizeDataRequest = async (requestId) => {
     try {
         return await prisma.request.delete({
@@ -1495,6 +1782,146 @@ export const updateOtherRequest = async (
     }
 };
 
+// export const getManagerUsersRequests = async (
+//     managerId,
+//     role,
+//     page = 1,
+//     limit,
+//     startDate,
+//     endDate,
+//     status,
+//     departement,
+// ) => {
+//     try {
+//         // Validate inputs
+//         if (page < 1) throw new Error("Page must be at least 1");
+//         if (limit < 1) throw new Error("Limit must be at least 1");
+
+//         const skip = (page - 1) * limit;
+
+//         // Helper to fetch user IDs with a single query
+//         const getUserIds = async ({
+//             managerId: managerIdCondition,
+//             role: targetRole,
+//             field = "managerId",
+//         }) => {
+//             const where = {
+//                 [field]: Array.isArray(managerIdCondition)
+//                     ? { in: managerIdCondition }
+//                     : managerIdCondition,
+//             };
+//             if (targetRole) where.role = targetRole;
+
+//             const users = await prisma.user.findMany({
+//                 where,
+//                 select: { id: true },
+//             });
+
+//             return users.map((user) => user.id);
+//         };
+
+//         // 1. Build the list of USER-IDs under this manager hierarchy
+//         let userIds = [];
+
+//         switch (role) {
+//             case "BRANCH_OFFICER":
+//                 const seniorIds = await getUserIds({ managerId, role: "SENIOR_OFFICER" });
+//                 const juniorIds = await getUserIds({
+//                     managerId: seniorIds,
+//                     role: "JUNIOR_OFFICER",
+//                 });
+//                 userIds = await getUserIds({ managerId: juniorIds, role: "USER" });
+//                 break;
+
+//             case "DEPT_CONTROLLER":
+//                 const senior_Ids = await getUserIds({ managerId, role: "SENIOR_OFFICER" });
+//                 const junior_Ids = await getUserIds({
+//                     managerId: senior_Ids,
+//                     role: "JUNIOR_OFFICER",
+//                 });
+//                 const sse_Ids = await getUserIds({ managerId: junior_Ids, role: "USER" });
+//                 const je_Ids = await getUserIds({ managerId: sse_Ids, role: "JE" });
+//                 userIds = [...sse_Ids, ...je_Ids];
+//                 break;
+
+//             case "SENIOR_OFFICER":
+//                 const juniorOfficerIds = await getUserIds({ managerId, role: "JUNIOR_OFFICER" });
+//                 userIds = await getUserIds({ managerId: juniorOfficerIds, role: "USER" });
+//                 break;
+
+//             case "JUNIOR_OFFICER":
+//                 userIds = await getUserIds({ managerId, role: "USER" });
+//                 break;
+
+//             default:
+//                 throw new Error(`Role ${role} is not supported for this endpoint`);
+//         }
+
+//         // Early return if no users found
+//         if (userIds.length === 0) {
+//             return {
+//                 requests: [],
+//                 total: 0,
+//                 page,
+//                 totalPages: 0,
+//             };
+//         }
+
+//         // 2. Build the where clause for requests
+//         const where = { userId: { in: userIds } };
+
+//         // Date filtering
+//         if (startDate && endDate) {
+//             where.date = {
+//                 gte: new Date(startDate),
+//                 lte: new Date(endDate),
+//             };
+//         } else if (startDate) {
+//             where.date = { gte: new Date(startDate) };
+//         } else if (endDate) {
+//             where.date = { lte: new Date(endDate) };
+//         }
+
+//         // Status filtering
+//         if (status && status !== "ALL") {
+//             where.status = status;
+//         }
+
+//         // 3. Query requests with pagination
+//         const [requests, total] = await Promise.all([
+//             prisma.request.findMany({
+//                 where,
+//                 include: {
+//                     user: {
+//                         select: {
+//                             id: true,
+//                             name: true,
+//                             email: true,
+//                             role: true,
+//                             depot: true,
+//                             department: true,
+//                         },
+//                     },
+//                 },
+//                 orderBy: { createdAt: "desc" },
+//                 skip,
+//                 take: limit,
+//             }),
+//             prisma.request.count({ where }),
+//         ]);
+
+//         return {
+//             requests,
+//             total,
+//             page,
+//             totalPages: Math.ceil(total / limit),
+//         };
+//     } catch (error) {
+//         console.error("Error in getManagerUsersRequests:", error);
+//         throw error;
+//     }
+// };
+
 export const getManagerUsersRequests = async (
     managerId,
     role,
@@ -1503,15 +1930,14 @@ export const getManagerUsersRequests = async (
     startDate,
     endDate,
     status,
+    departement,
 ) => {
     try {
-        // Validate inputs
         if (page < 1) throw new Error("Page must be at least 1");
         if (limit < 1) throw new Error("Limit must be at least 1");
 
         const skip = (page - 1) * limit;
 
-        // Helper to fetch user IDs with a single query
         const getUserIds = async ({
             managerId: managerIdCondition,
             role: targetRole,
@@ -1532,7 +1958,7 @@ export const getManagerUsersRequests = async (
             return users.map((user) => user.id);
         };
 
-        // 1. Build the list of USER-IDs under this manager hierarchy
+        // ------------------- HIERARCHY LOGIC (UNCHANGED) -------------------
         let userIds = [];
 
         switch (role) {
@@ -1569,37 +1995,37 @@ export const getManagerUsersRequests = async (
                 throw new Error(`Role ${role} is not supported for this endpoint`);
         }
 
-        // Early return if no users found
+        // If no users found under hierarchy
         if (userIds.length === 0) {
             return {
                 requests: [],
                 total: 0,
                 page,
                 totalPages: 0,
+                specialDeptRequests: [],
             };
         }
 
-        // 2. Build the where clause for requests
-        const where = { userId: { in: userIds } };
+        // ------------------- DATE & STATUS FILTERS -------------------
+        const dateFilter =
+            startDate || endDate
+                ? {
+                      date: {
+                          ...(startDate && { gte: new Date(startDate) }),
+                          ...(endDate && { lte: new Date(endDate) }),
+                      },
+                  }
+                : {};
 
-        // Date filtering
-        if (startDate && endDate) {
-            where.date = {
-                gte: new Date(startDate),
-                lte: new Date(endDate),
-            };
-        } else if (startDate) {
-            where.date = { gte: new Date(startDate) };
-        } else if (endDate) {
-            where.date = { lte: new Date(endDate) };
-        }
+        const statusFilter = status && status !== "ALL" ? { status } : {};
 
-        // Status filtering
-        if (status && status !== "ALL") {
-            where.status = status;
-        }
+        // ------------------- HIERARCHY BASED REQUESTS -------------------
+        const where = {
+            userId: { in: userIds },
+            ...dateFilter,
+            ...statusFilter,
+        };
 
-        // 3. Query requests with pagination
         const [requests, total] = await Promise.all([
             prisma.request.findMany({
                 where,
@@ -1622,17 +2048,63 @@ export const getManagerUsersRequests = async (
             prisma.request.count({ where }),
         ]);
 
+        // ------------------- SPECIAL DEPT REQUESTS (IGNORES HIERARCHY) -------------------
+        let specialDeptRequests = [];
+
+        if (departement) {
+            let deptCondition = {};
+
+            if (departement === "ENGG") {
+                deptCondition = {
+                    enggDisconnectionsRequired: true,
+                    allEnggAcceptance: { not: "ACCEPTED" },
+                };
+            } else if (departement === "S&T") {
+                deptCondition = {
+                    sntDisconnectionRequired: true,
+                    allSntAcceptance: { not: "ACCEPTED" },
+                };
+            } else if (departement === "TRD") {
+                deptCondition = { powerBlockRequired: true, allTrdAcceptance: { not: "ACCEPTED" } };
+            }
+
+            specialDeptRequests = await prisma.request.findMany({
+                where: {
+                    ...deptCondition,
+                    ...dateFilter,
+                    ...statusFilter,
+                },
+                include: {
+                    user: {
+                        select: {
+                            id: true,
+                            name: true,
+                            email: true,
+                            role: true,
+                            depot: true,
+                            department: true,
+                        },
+                    },
+                },
+                orderBy: { createdAt: "desc" },
+                skip,
+                take: limit,
+            });
+        }
+
         return {
-            requests,
+            requests, // hierarchy
             total,
             page,
             totalPages: Math.ceil(total / limit),
+            specialDeptRequests, // ✅ department-based flagged requests
         };
     } catch (error) {
         console.error("Error in getManagerUsersRequests:", error);
         throw error;
     }
 };
+
 // export const getManagerUsersRequests = async (managerId, role, page = 1, limit = 10) => {
 //     const skip = (page - 1) * limit;
 
@@ -2519,20 +2991,119 @@ export const approveAllPendingRequests = async (adminId, startDate, endDate) => 
 //         throw new Error('Database operation failed');
 //     }
 // };
+// export const saveOptimizedData = async (optimizedData) => {
+//     try {
+//         // First, create the optimized records
+//         const created = await prisma.optimize_Table.createMany({
+//             data: optimizedData.map((request) => {
+//                 // Combine date with time for proper DateTime format
+//                 const timeFrom = new Date(`${request.date}T${request.optimisedTimeFrom}:00`);
+//                 const timeTo = new Date(`${request.date}T${request.optimisedTimeTo}:00`);
+
+//                 return {
+//                     id: request.id,
+//                     optimizeTimeFrom: timeFrom,
+//                     optimizeTimeTo: timeTo,
+//                     date: new Date(request.date),
+//                     missionBlock: request.missionBlock,
+//                     otherAffectedLine: request.otherAffectedLine,
+//                     selectedDepartment: request.selectedDepartment,
+//                     selectedDepo: request.selectedDepo,
+//                     selectedStream: request.selectedStream,
+//                     selectedLine:
+//                         request.selectedLine ||
+//                         request.processedLineSections?.[0]?.lineName ||
+//                         "N/A",
+//                     selectedSection: request.selectedSection,
+//                 };
+//             }),
+//             skipDuplicates: true,
+//         });
+
+//         // Then update the original requests with the optimized times
+//         await Promise.all(
+//             optimizedData.map(async (request) => {
+//                 const timeFrom = new Date(`${request.date}T${request.optimisedTimeFrom}:00`);
+//                 const timeTo = new Date(`${request.date}T${request.optimisedTimeTo}:00`);
+
+//                 await prisma.Request.update({
+//                     where: { id: request.id },
+//                     data: {
+//                         optimizeTimeFrom: timeFrom,
+//                         optimizeTimeTo: timeTo,
+//                     },
+//                 });
+//             }),
+//         );
+
+//         return {
+//             success: true,
+//             count: created.count,
+//             message: `${created.count} new optimized records added and requests updated`,
+//         };
+//     } catch (error) {
+//         console.error("Failed to process optimized data:", error);
+//         throw new Error("Database operation failed");
+//     }
+// };
 export const saveOptimizedData = async (optimizedData) => {
     try {
+        // Fetch original requests to get demandTimeFrom and demandTimeTo
+        const requestIds = optimizedData.map((r) => r.id);
+        const originalRequests = await prisma.Request.findMany({
+            where: { id: { in: requestIds } },
+            select: {
+                id: true,
+                demandTimeFrom: true,
+                demandTimeTo: true,
+            },
+        });
+
+        // Create a map for easy access
+        const originalMap = new Map(originalRequests.map((r) => [r.id, r]));
+
         // First, create the optimized records
         const created = await prisma.optimize_Table.createMany({
             data: optimizedData.map((request) => {
-                // Combine date with time for proper DateTime format
-                const timeFrom = new Date(`${request.date}T${request.optimisedTimeFrom}:00`);
-                const timeTo = new Date(`${request.date}T${request.optimisedTimeTo}:00`);
+                const originalRequest = originalMap.get(request.id);
+                if (!originalRequest) {
+                    throw new Error(`Original request ${request.id} not found`);
+                }
+
+                // Extract date parts from original demand times (UTC)
+                const demandFromDate = originalRequest.demandTimeFrom.toISOString().split("T")[0];
+                const demandToDate = originalRequest.demandTimeTo.toISOString().split("T")[0];
+
+                // Parse optimized times
+                const [fromHours, fromMinutes] = request.optimisedTimeFrom.split(":").map(Number);
+                const [toHours, toMinutes] = request.optimisedTimeTo.split(":").map(Number);
+
+                // Create dates in UTC to avoid timezone conversion
+                let timeFrom, timeTo;
+
+                if (toHours < fromHours || (toHours === fromHours && toMinutes < fromMinutes)) {
+                    // Time crosses midnight - end time is next day
+                    const [year, month, day] = demandFromDate.split("-").map(Number);
+                    timeFrom = new Date(Date.UTC(year, month - 1, day, fromHours, fromMinutes, 0));
+
+                    // Next day for end time
+                    timeTo = new Date(Date.UTC(year, month - 1, day + 1, toHours, toMinutes, 0));
+                } else {
+                    // Normal case - same day
+                    const [yearFrom, monthFrom, dayFrom] = demandFromDate.split("-").map(Number);
+                    const [yearTo, monthTo, dayTo] = demandToDate.split("-").map(Number);
+
+                    timeFrom = new Date(
+                        Date.UTC(yearFrom, monthFrom - 1, dayFrom, fromHours, fromMinutes, 0),
+                    );
+                    timeTo = new Date(Date.UTC(yearTo, monthTo - 1, dayTo, toHours, toMinutes, 0));
+                }
 
                 return {
                     id: request.id,
                     optimizeTimeFrom: timeFrom,
                     optimizeTimeTo: timeTo,
-                    date: new Date(request.date),
+                    date: new Date(request.date), // Use UTC date
                     missionBlock: request.missionBlock,
                     otherAffectedLine: request.otherAffectedLine,
                     selectedDepartment: request.selectedDepartment,
@@ -2551,8 +3122,34 @@ export const saveOptimizedData = async (optimizedData) => {
         // Then update the original requests with the optimized times
         await Promise.all(
             optimizedData.map(async (request) => {
-                const timeFrom = new Date(`${request.date}T${request.optimisedTimeFrom}:00`);
-                const timeTo = new Date(`${request.date}T${request.optimisedTimeTo}:00`);
+                const originalRequest = originalMap.get(request.id);
+                if (!originalRequest) return;
+
+                // Extract date parts from original demand times (UTC)
+                const demandFromDate = originalRequest.demandTimeFrom.toISOString().split("T")[0];
+                const demandToDate = originalRequest.demandTimeTo.toISOString().split("T")[0];
+
+                // Parse optimized times
+                const [fromHours, fromMinutes] = request.optimisedTimeFrom.split(":").map(Number);
+                const [toHours, toMinutes] = request.optimisedTimeTo.split(":").map(Number);
+
+                let timeFrom, timeTo;
+
+                if (toHours < fromHours || (toHours === fromHours && toMinutes < fromMinutes)) {
+                    // Time crosses midnight
+                    const [year, month, day] = demandFromDate.split("-").map(Number);
+                    timeFrom = new Date(Date.UTC(year, month - 1, day, fromHours, fromMinutes, 0));
+                    timeTo = new Date(Date.UTC(year, month - 1, day + 1, toHours, toMinutes, 0));
+                } else {
+                    // Normal case
+                    const [yearFrom, monthFrom, dayFrom] = demandFromDate.split("-").map(Number);
+                    const [yearTo, monthTo, dayTo] = demandToDate.split("-").map(Number);
+
+                    timeFrom = new Date(
+                        Date.UTC(yearFrom, monthFrom - 1, dayFrom, fromHours, fromMinutes, 0),
+                    );
+                    timeTo = new Date(Date.UTC(yearTo, monthTo - 1, dayTo, toHours, toMinutes, 0));
+                }
 
                 await prisma.Request.update({
                     where: { id: request.id },
@@ -2574,7 +3171,6 @@ export const saveOptimizedData = async (optimizedData) => {
         throw new Error("Database operation failed");
     }
 };
-
 export const getTrdRequests = async (
     selectedDepo,
     page = 1,
@@ -3103,6 +3699,7 @@ export const userRequestRemarkReject = async (id, remark) => {
     // Calculate overall status after user rejection (back to previous state)
     const overAllStatus = calculateOverallStatus({
         ...request,
+        remark: remark || "",
         userAcceptanceForSanction: false,
     });
 
@@ -3143,6 +3740,7 @@ export const editUserRequest = async (requestId, data) => {
             date: new Date(data.date),
             demandTimeFrom: new Date(data.demandTimeFrom),
             demandTimeTo: new Date(data.demandTimeTo),
+            tpcRemarks: data.tpcRemarks || "",
         };
 
         // Validate that demandTimeTo is after demandTimeFrom
@@ -3165,6 +3763,7 @@ export const editUserRequest = async (requestId, data) => {
                 selectedDepartment: true,
                 selectedSection: true,
                 activity: true,
+                tpcRemarks: true,
             },
         });
 

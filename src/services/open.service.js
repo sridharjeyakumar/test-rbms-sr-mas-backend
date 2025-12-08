@@ -145,10 +145,17 @@ export const fetchSanctionedRequests = async (startDate, endDate, CUG, availedRe
             SntDisconnectionAvailedTimeTo: true,
             TrdDisconnectionAvailedTimeFrom: true,
             TrdDisconnectionAvailedTimeTo: true,
+            AppliedTimeFrom: true,
+            AppliedTimeTo: true,
             isGranted: true,
             isApplied: true,
             sntDisconnectionRequirements: true,
             powerBlockRequirements: true,
+            blockBurst: true,
+            repercussions: true,
+            assetName: true,
+            assetNumber: true,
+            sanctionedRemarks: true,
             availedBy: {
                 select: {
                     name: true,
@@ -289,6 +296,8 @@ export const fetchSanctionedRequests = async (startDate, endDate, CUG, availedRe
             sntDisconnectionAvailedTimeFrom: request.SntDisconnectionAvailedTimeFrom,
             sntDisconnectionAvailedTimeTo: request.SntDisconnectionAvailedTimeTo,
             trdDisconnectionAvailedTimeFrom: request.TrdDisconnectionAvailedTimeFrom,
+            appliedTimeFrom: request.AppliedTimeFrom,
+            appliedTimeTo: request.AppliedTimeTo,
             trdDisconnectionAvailedTimeTo: request.TrdDisconnectionAvailedTimeTo,
             sntDisconnectionRequirements: request.sntDisconnectionRequirements,
             powerBlockRequirements: request.powerBlockRequirements,
@@ -304,6 +313,11 @@ export const fetchSanctionedRequests = async (startDate, endDate, CUG, availedRe
             // Add noOfTrackMachines field if available
             noOfTrackMachines: noOfTrackMachines,
             overAllStatus: request.overAllStatus,
+            blockBurst: request.blockBurst,
+            repercussions: request.repercussions,
+            assetName: request.assetName,
+            assetNumber: request.assetNumber,
+            sanctionedRemarks: request.sanctionedRemarks,
             user: request.user
                 ? {
                       applicantName: request.user.name,
@@ -339,7 +353,7 @@ export const updateSanctionedRequestAvailed = async (id, availed, additionalData
             ? additionalData.isGranted
             : existingRequest.isGranted;
 
-    if (!finalIsGranted) {
+    if (!finalIsGranted && additionalData.isApplied !== true) {
         throw new Error("Cannot update availedResponse when isGranted is false");
     }
 
@@ -395,28 +409,34 @@ export const updateSanctionedRequestAvailed = async (id, availed, additionalData
     }
 
     // Add SNT disconnection availed times if they exist
-    if (additionalData.sntDisconnectionAvailedTimeFrom) {
+    if (additionalData.SntDisconnectionAvailedTimeFrom) {
         updateData.SntDisconnectionAvailedTimeFrom = new Date(
-            additionalData.sntDisconnectionAvailedTimeFrom,
+            additionalData.SntDisconnectionAvailedTimeFrom,
         );
     }
 
-    if (additionalData.sntDisconnectionAvailedTimeTo) {
+    if (additionalData.SntDisconnectionAvailedTimeTo) {
         updateData.SntDisconnectionAvailedTimeTo = new Date(
-            additionalData.sntDisconnectionAvailedTimeTo,
+            additionalData.SntDisconnectionAvailedTimeTo,
         );
     }
 
+    if (additionalData.AppliedTimeFrom) {
+        updateData.AppliedTimeFrom = new Date(additionalData.AppliedTimeFrom);
+    }
+    if (additionalData.AppliedTimeTo) {
+        updateData.AppliedTimeTo = new Date(additionalData.AppliedTimeTo);
+    }
     // Add TRD disconnection availed times if they exist
-    if (additionalData.trdDisconnectionAvailedTimeFrom) {
+    if (additionalData.TrdDisconnectionAvailedTimeFrom) {
         updateData.TrdDisconnectionAvailedTimeFrom = new Date(
-            additionalData.trdDisconnectionAvailedTimeFrom,
+            additionalData.TrdDisconnectionAvailedTimeFrom,
         );
     }
 
-    if (additionalData.trdDisconnectionAvailedTimeTo) {
+    if (additionalData.TrdDisconnectionAvailedTimeTo) {
         updateData.TrdDisconnectionAvailedTimeTo = new Date(
-            additionalData.trdDisconnectionAvailedTimeTo,
+            additionalData.TrdDisconnectionAvailedTimeTo,
         );
     }
     // Update isGranted flag if it exists
@@ -424,8 +444,11 @@ export const updateSanctionedRequestAvailed = async (id, availed, additionalData
         updateData.isGranted = additionalData.isGranted;
     }
 
-    if (additionalData.isGranted === true) {
+    if (additionalData.isApplied === true) {
         updateData.isApplied = additionalData.isApplied;
+    }
+    if (additionalData.blockBurst !== undefined) {
+        updateData.blockBurst = additionalData.blockBurst;
     }
 
     const updatedRequest = await prisma.request.update({
@@ -445,9 +468,12 @@ export const updateSanctionedRequestAvailed = async (id, availed, additionalData
             SntDisconnectionAvailedTimeFrom: true,
             SntDisconnectionAvailedTimeTo: true,
             TrdDisconnectionAvailedTimeFrom: true,
+            AppliedTimeFrom: true,
+            AppliedTimeTo: true,
             TrdDisconnectionAvailedTimeTo: true,
             isGranted: true,
             isApplied: true,
+            blockBurst: true,
             availedBy: {
                 select: {
                     id: true,

@@ -39,6 +39,7 @@ model Request {
   id                                String     @id @default(uuid())
   divisionId                        String?    @unique
   date                              DateTime
+  freshCautions                      Json?
   selectedDepartment                String
   selectedSection                   String
   stationID                         String?
@@ -142,7 +143,14 @@ model Request {
   trdAcceptRemarks                  String?
   duration                          DateTime?
   isApplied                         Boolean?
+  AppliedTimeFrom                   DateTime?
+  AppliedTimeTo                     DateTime?
   engDisconnectionRequired          Boolean?   @default(false)
+  tpcRemarks                        String?
+  Draft                             Boolean?   @default(false)
+  blockBurst                        Boolean?   @default(false)
+  assetName                         String?
+  assetNumber                       String?
 
   @@index([userId])
   @@index([managerAcceptanceId])

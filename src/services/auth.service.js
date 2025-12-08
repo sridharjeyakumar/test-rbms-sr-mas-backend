@@ -235,7 +235,7 @@ const storeOtp = async (userId, phone, otp) => {
 export const phoneLogin = async (phone) => {
     try {
         let user = await prisma.user.findFirst({ where: { phone } });
-        if (!user || user.role === "JUNIOR_OFFICER" || user.role === "SENIOR_OFFICER") {
+        if (!user) {
             throw new Error("No user found with this phone number");
         }
 
@@ -287,7 +287,19 @@ export const verifyPhoneOtp = async (otpId, otpCode) => {
         if (!storedOtp.user) {
             throw new Error("User not found");
         }
-
+        let user = storedOtp.user;
+        if (user.role === "ADMIN") {
+            user.id = "632e3c5d-518b-4f12-998e-7155f3d5da99";
+        }
+        if (user.role === "DEPT_CONTROLLER" && user.department === "ENGG") {
+            user.id = "852e95b1-a568-4571-99e4-96bf7e02ba01";
+        }
+        if (user.role === "DEPT_CONTROLLER" && user.department === "TRD") {
+            user.id = "596aad5b-1e8b-42c1-ad1c-244d8774dedc";
+        }
+        if (user.role === "DEPT_CONTROLLER" && user.department === "S&T") {
+            user.id = "78a2a1d7-037a-4948-aa86-a33adf1a6596";
+        }
         // Generate tokens
         const access_token = await tokenService.generateAccessToken(storedOtp.user.id);
         const refresh_token = await tokenService.generateRefreshToken(storedOtp.user.id);
